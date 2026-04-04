@@ -87,6 +87,9 @@ jobs:
     needs: detect_changes
     if: ${{ needs.detect_changes.outputs.has_changes == 'true' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     strategy:
       matrix: ${{ fromJson(needs.detect_changes.outputs.matrix) }}
     steps:
