@@ -1,0 +1,6 @@
+_extends: monorepo-release-drafter-sample:.github/release_drafter_configs/base.yml # extend元の設定ファイルをリポジトリ名:ファイルパスで指定
+name-template: service-b@$RESOLVED_VERSION # リリースノートのタイトルはタグ名と同じにする
+tag-template: service-b@$RESOLVED_VERSION # タイトルとタグ名を同じにする
+tag-prefix: service-b@ # tagのprefixを指定
+include-paths: # service-bのリリースノートに含めるファイルパスを指定
+  - "service_b/"

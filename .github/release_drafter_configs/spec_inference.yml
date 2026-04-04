@@ -1,0 +1,6 @@
+_extends: monorepo-release-drafter-sample:.github/release_drafter_configs/base.yml # extend元の設定ファイルをリポジトリ名:ファイルパスで指定
+name-template: spec-inference@$RESOLVED_VERSION # リリースノートのタイトルはタグ名と同じにする
+tag-template: spec-inference@$RESOLVED_VERSION # タイトルとタグ名を同じにする
+tag-prefix: spec-inference@ # tagのprefixを指定
+include-paths: # spec-inferenceのリリースノートに含めるファイルパスを指定
+  - "projects/specs/infrence/"

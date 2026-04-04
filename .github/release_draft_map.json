@@ -1,0 +1,20 @@
+{
+    "service_a": {
+        "filters": [
+            "projects/service_a/**"
+        ],
+        "working_dir": "projects/service_a"
+    },
+    "service_b": {
+        "filters": [
+            "service_b/**"
+        ],
+        "working_dir": "service_b"
+    },
+    "spec_inference": {
+        "filters": [
+            "projects/specs/infrence/**"
+        ],
+        "working_dir": "projects/specs/infrence"
+    }
+}

@@ -1,0 +1,140 @@
+name: paths-filter job level conditional execution
+
+# mainにマージした時に、変更されたファイルに応じて、リリースドラフターの内容を変えるためのworkflow。
+on:
+  pull_request:
+    branches:
+      - "master"
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  detect_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.build-matrix.outputs.has_changes }}
+      matrix: ${{ steps.build-matrix.outputs.matrix }}
+    steps:
+    - uses: actions/checkout@v6
+    - name: Build filters from release_draft_map.json
+      id: generate-filters
+      run: |
+        python3 <<'PY'
+        import json
+        import os
+        from pathlib import Path
+
+        map_path = Path(".github/release_draft_map.json")
+        release_draft_map = json.loads(map_path.read_text(encoding="utf-8"))
+
+        filter_lines = []
+        for name, config in release_draft_map.items():
+            filter_lines.append(f"{name}:")
+            for pattern in config["filters"]:
+                filter_lines.append(f"  - '{pattern}'")
+
+        github_output = Path(os.environ["GITHUB_OUTPUT"])
+        with github_output.open("a", encoding="utf-8") as output:
+            output.write("filters<<EOF\n")
+            output.write("\n".join(filter_lines))
+            output.write("\nEOF\n")
+        PY
+    - uses: dorny/paths-filter@v4
+      id: filter
+      with:
+        filters: ${{ steps.generate-filters.outputs.filters }}
+
+    - name: Build release matrix
+      id: build-matrix
+      env:
+        CHANGED_FILTERS: ${{ steps.filter.outputs.changes }}
+      run: |
+        python3 <<'PY'
+        import json
+        import os
+        from pathlib import Path
+
+        map_path = Path(".github/release_draft_map.json")
+        release_draft_map = json.loads(map_path.read_text(encoding="utf-8"))
+
+        raw_changed_filters = os.environ.get("CHANGED_FILTERS", "").strip() or "[]"
+        changed_filters = set(json.loads(raw_changed_filters))
+
+        include = []
+        for name, config in release_draft_map.items():
+            if name not in changed_filters:
+                continue
+
+            include.append(
+                {
+                    "name": name,
+                    "config_name": f"release_drafter_configs/{name}.yml",
+                    "working_dir": config["working_dir"],
+                }
+            )
+
+        github_output = Path(os.environ["GITHUB_OUTPUT"])
+        with github_output.open("a", encoding="utf-8") as output:
+            output.write(f"has_changes={'true' if include else 'false'}\n")
+            output.write(f"matrix={json.dumps({'include': include})}\n")
+        PY
+
+  # ここで、リリースドラフターを作るようにする。(matrixを使う)
+  create_release:
+    needs: detect_changes
+    if: ${{ needs.detect_changes.outputs.has_changes == 'true' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJson(needs.detect_changes.outputs.matrix) }}
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+    - name: Install Node.js and npm
+      uses: actions/setup-node@v6
+      with:
+        node-version: 24
+        package-manager-cache: false
+    - name: Resolve next version
+      id: resolve-version
+      shell: bash
+      run: |
+        working_dir="${{ matrix.working_dir }}"
+        version=""
+        version_source=""
+
+        if [[ -f "$working_dir/pyproject.toml" ]]; then
+          version=$(cd "$working_dir" && uv version --short)
+          version_source="$working_dir/pyproject.toml"
+        elif [[ -f "$working_dir/package.json" ]]; then
+          version=$(npm pkg get version --prefix "$working_dir" | tr -d '"[:space:]')
+          version_source="$working_dir/package.json"
+        else
+          echo "pyproject.toml or package.json was not found in $working_dir" >&2
+          exit 1
+        fi
+
+        if [[ -z "$version" ]]; then
+          echo "version was not found in $version_source" >&2
+          exit 1
+        fi
+
+        IFS='.' read -r major minor patch <<< "$version"
+        if [[ -z "$major" || -z "$minor" || -z "$patch" ]]; then
+          echo "version must be MAJOR.MINOR.PATCH, got: $version" >&2
+          exit 1
+        fi
+
+
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "version_source=$version_source" >> "$GITHUB_OUTPUT"
+    - name: Create release draft
+      uses: release-drafter/release-drafter@v5
+      with:
+        config-name: ${{ matrix.config_name }}
+        version: ${{ steps.resolve-version.outputs.version }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
