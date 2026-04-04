@@ -1,7 +1,7 @@
 def main():
     print("Hello from service-a!")
 
-print("Test Add 2")
+print("Test Add")
 
 
 if __name__ == "__main__":
