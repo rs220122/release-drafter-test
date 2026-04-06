@@ -3,6 +3,7 @@ tag-template: service-a@$RESOLVED_VERSION # タイトルとタグ名を同じに
 tag-prefix: service-a@ # tagのprefixを指定
 include-paths: # service-aのリリースノートに含めるファイルパスを指定
   - "projects/service_a/"
+  - ".github/common.yml"
 
 
 template: |

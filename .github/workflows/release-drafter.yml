@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   detect_changes:
+    if: startsWith(github.event.pull_request.head.ref, 'release/')
     runs-on: ubuntu-latest
     outputs:
       has_changes: ${{ steps.build-matrix.outputs.has_changes }}
